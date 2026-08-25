@@ -1,0 +1,9 @@
+@* Routes.razor — mappar URL:er till rätt Blazor-komponent
+   @page-direktivet i varje .razor-sida styr vilken URL den svarar på *@
+
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

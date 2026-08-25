@@ -1,0 +1,430 @@
+@* Home.razor — uppdragsportalen för Skurk AB
+   En Blazor-komponent: HTML, C# och CSS i samma fil.
+
+   Ny på Blazor? Läs igenom introduktionen först:
+   → 35_natverk_sakerhet/notes/blazor_intro.md
+
+   Din uppgift är att implementera de metoder som är markerade med TODO.
+   Strukturen är klar — du fyller i HTTP-anropen mot ditt eget API.
+
+   The Continental tillåter inga obehöriga. Inte ens i koden. *@
+
+@page "/"
+
+@* @inject = dependency injection, som att ta emot en prop eller använda en custom hook i React.
+   Tjänsterna är registrerade i Program.cs och injekteras automatiskt här. *@
+@inject IHttpClientFactory HttpClientFactory
+@inject ILogger<Home> Logger
+
+@* InteractiveServer håller en WebSocket-anslutning till servern öppen.
+   Klick och state-ändringar skickas dit och renderas tillbaka — som React men server-side. *@
+@rendermode InteractiveServer
+
+<h2>Aktiva uppdrag</h2>
+
+@if (laddar)
+{
+    <p class="status">Hämtar uppdrag...</p>
+}
+else if (uppdrag.Count == 0)
+{
+    <p class="status">Inga aktiva uppdrag. Skapa det första.</p>
+}
+else
+{
+    <table class="uppdragstabell">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Titel</th>
+                <th>Konsult</th>
+                <th>Status</th>
+                <th>Prioritet</th>
+                <th>Tilldela konsult</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @* @foreach = .map() i React — loopar listan och renderar en rad per objekt *@
+            @foreach (var u in uppdrag)
+            {
+                <tr>
+                    <td class="id">@u.Id</td>
+                    <td>@u.Titel</td>
+                    <td class="konsult">@u.Konsult</td>
+                    <td>
+                        @* select + @onchange = <select onChange={...}> i React.
+                           e.Value är det valda värdet — som e.target.value i JS. *@
+                        <select class="inline-select @StatusKlass(u.Status)"
+                                value="@u.Status"
+                                @onchange="e => AndraStatus(u.Id, e.Value?.ToString() ?? u.Status)">
+                            <option value="Planeras">Planeras</option>
+                            <option value="Pågående">Pågående</option>
+                            <option value="Slutfört">Slutfört</option>
+                            <option value="Avbrutet">Avbrutet</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select class="inline-select"
+                                value="@u.Prioritet"
+                                @onchange="e => AndraPrioritet(u.Id, e.Value?.ToString() ?? u.Prioritet)">
+                            <option value="Låg">Låg</option>
+                            <option value="Medel">Medel</option>
+                            <option value="Hög">Hög</option>
+                            <option value="KRITISK">KRITISK</option>
+                        </select>
+                    </td>
+                    <td>
+                        @* Combobox med alla konsulter — TODO: anropa PUT /uppdrag/{id}/konsult *@
+                        <select class="inline-select"
+                                value="@u.Konsult"
+                                @onchange="e => TilldelaKonsult(u.Id, e.Value?.ToString() ?? string.Empty)">
+                            <option value="">— välj konsult —</option>
+                            @foreach (var k in konsulter)
+                            {
+                                <option value="@k.Namn">@k.Namn</option>
+                            }
+                        </select>
+                    </td>
+                    <td>
+                        <button class="avbrytknapp" @onclick="() => AvbrytUppdrag(u.Id)">
+                            Avbryt
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<hr />
+
+<h2>Konsultregister</h2>
+
+@* The Continental har ett register över tillgängliga konsulter.
+   Vad du ser beror på din behörighetsnivå — RBAC i Azure styr detta, inte koden.
+   Praktikant → namn + telefon. Mellanchef → namn + adress.
+   Konsultchef och Admin → allt, inklusive möjligheten att tilldela konsulter till uppdrag. *@
+
+@if (konsulter.Count == 0)
+{
+    <p class="status">Inga konsulter i registret.</p>
+}
+else
+{
+    <table class="uppdragstabell">
+        <thead>
+            <tr>
+                <th>Namn</th>
+                <th>Telefon</th>
+                <th>Adress</th>
+                <th>Stad</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var k in konsulter)
+            {
+                <tr>
+                    <td>@k.Namn</td>
+                    @* Fält som är null returneras inte av API:t för din roll — visas tomt *@
+                    <td class="konsult">@(k.Telefon ?? "—")</td>
+                    <td class="konsult">@(k.Adress  ?? "—")</td>
+                    <td class="konsult">@(k.Stad    ?? "—")</td>
+                    <td>
+                        <button class="avbrytknapp" @onclick="() => RaderaKonsult(k.Id)">
+                            Radera
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<div class="nyttuppdrag" style="margin-top:1rem">
+    <div class="falt">
+        <label>Nytt konsultnamn</label>
+        <input type="text" @bind="nyttKonsultnamn" placeholder="Gurli Grym..." />
+    </div>
+    <button @onclick="SkapaKonsult" disabled="@string.IsNullOrWhiteSpace(nyttKonsultnamn)">
+        Registrera konsult
+    </button>
+    @if (!string.IsNullOrEmpty(konsultFelmeddelande))
+    {
+        <p class="fel">@konsultFelmeddelande</p>
+    }
+</div>
+
+<hr />
+
+<h2>Nytt uppdrag</h2>
+
+<div class="nyttuppdrag">
+    <div class="falt">
+        <label>Titel</label>
+        @* @bind = controlled input i React: value={titel} onChange={e => setTitel(e.target.value)}
+           Blazor hanterar båda riktningarna med ett enda direktiv. *@
+        <input type="text" @bind="titel" placeholder="Operation Mörkblå..." />
+    </div>
+    <div class="falt">
+        <label>Prioritet</label>
+        <select @bind="prioritet">
+            <option value="Låg">Låg</option>
+            <option value="Medel">Medel</option>
+            <option value="Hög">Hög</option>
+            <option value="KRITISK">KRITISK</option>
+        </select>
+    </div>
+    <button @onclick="SkapaUppdrag" disabled="@string.IsNullOrWhiteSpace(titel)">
+        Skapa uppdrag
+    </button>
+    @if (!string.IsNullOrEmpty(felmeddelande))
+    {
+        <p class="fel">@felmeddelande</p>
+    }
+</div>
+
+@code {
+    // Uppdrag
+    private List<Uppdrag> uppdrag       = new();
+    private bool          laddar        = true;
+    private string        titel         = "";
+    private string        prioritet     = "Medel";
+    private string        felmeddelande = "";
+
+    // Konsulter
+    private List<Konsult> konsulter          = new();
+    private string        nyttKonsultnamn    = "";
+    private string        konsultFelmeddelande = "";
+
+    // OnInitializedAsync = useEffect(() => { fetch() }, []) i React
+    // Körs en gång när komponenten mountas — perfekt för att hämta initial data.
+    protected override async Task OnInitializedAsync()
+    {
+        await HamtaUppdrag();
+        await HamtaKonsulter();
+    }
+
+    private async Task HamtaUppdrag()
+    {
+        laddar = true;
+
+        // TODO: Anropa GET /uppdrag på ditt API och fyll listan `uppdrag`
+        // Tips: HttpClientFactory.CreateClient("SkurkApi") ger dig en konfigurerad HttpClient
+        // Tips: GetFromJsonAsync<List<Uppdrag>>("/uppdrag") deserialiserar JSON åt dig automatiskt
+        await Task.CompletedTask; // ta bort den här raden när du lägger in ditt API-anrop
+
+        // DEMO: ett exempeluppdrag så du ser hur tabellen, dropdown och combobox renderas.
+        // Ersätts av riktiga uppdrag när du implementerar GET /uppdrag ovan.
+        uppdrag = [ new(1, "Operation Mörkblå", "Pågående", "KRITISK", "Ronny Rövare") ];
+
+        laddar = false;
+    }
+
+    private async Task SkapaUppdrag()
+    {
+        if (string.IsNullOrWhiteSpace(titel)) return;
+
+        // TODO: Skicka ett nytt uppdrag till POST /uppdrag på ditt API
+        // Tips: PostAsJsonAsync("/uppdrag", new { Titel = titel, Prioritet = prioritet, Status = "Planeras" })
+        // Tips: Anropa HamtaUppdrag() efteråt så uppdateras listan
+
+        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera POST /uppdrag";
+    }
+
+    private async Task AvbrytUppdrag(int id)
+    {
+        // TODO: Anropa DELETE /uppdrag/{id} på ditt API
+        // Tips: Anropa HamtaUppdrag() efteråt så försvinner uppdraget från tabellen
+
+        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera DELETE /uppdrag/{id}";
+        await Task.CompletedTask;
+    }
+
+    private async Task AndraStatus(int id, string nyStatus)
+    {
+        // TODO: Anropa PUT /uppdrag/{id} med nyStatus
+        // Tips: PutAsJsonAsync($"/uppdrag/{id}", new { Status = nyStatus })
+        // Tips: Bara Mellanchef och högre har rätt att ändra status — API:t nekar annars
+        // Tips: Anropa HamtaUppdrag() efteråt
+
+        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera PUT /uppdrag/{id}";
+        await Task.CompletedTask;
+    }
+
+    private async Task AndraPrioritet(int id, string nyPrioritet)
+    {
+        // TODO: Anropa PUT /uppdrag/{id} med nyPrioritet
+        // Tips: PutAsJsonAsync($"/uppdrag/{id}", new { Prioritet = nyPrioritet })
+        // Tips: Anropa HamtaUppdrag() efteråt
+
+        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera PUT /uppdrag/{id}";
+        await Task.CompletedTask;
+    }
+
+    private async Task TilldelaKonsult(int uppdragId, string konsultNamn)
+    {
+        if (string.IsNullOrEmpty(konsultNamn)) return;
+
+        // TODO: Anropa PUT /uppdrag/{id}/konsult med konsultNamn (eller konsult-id om API:t kräver det)
+        // Tips: Bara Konsultchef och Admin har rätt att tilldela konsulter — API:t nekar annars
+        // Tips: Anropa HamtaUppdrag() efteråt så tabellen uppdateras
+
+        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera PUT /uppdrag/{id}/konsult";
+        await Task.CompletedTask;
+    }
+
+    private async Task HamtaKonsulter()
+    {
+        // TODO: Anropa GET /konsulter och fyll listan `konsulter`
+        // OBS: API:t returnerar bara de fält din roll har rätt att se.
+        //      Praktikant  → Telefon fylls i, Adress/Stad är null
+        //      Mellanchef  → Adress/Stad fylls i, Telefon är null
+        //      Konsultchef och Admin → alla fält
+        await Task.CompletedTask;
+
+        // DEMO: en exempelkonsult så du ser hur listan och konsult-comboboxen i uppdragstabellen populeras.
+        // Ersätts av riktiga konsulter när du implementerar GET /konsulter ovan.
+        konsulter = [ new(1, "Ronny Rövare", "070-666666", "Mörkret 1", "Stockholm") ];
+    }
+
+    private async Task SkapaKonsult()
+    {
+        if (string.IsNullOrWhiteSpace(nyttKonsultnamn)) return;
+
+        // TODO: Anropa POST /konsulter med det nya konsultnamnet
+        // Tips: Bara Konsultchef och Admin har rätt att registrera konsulter — API:t nekar annars
+        // Tips: Anropa HamtaKonsulter() efteråt
+
+        konsultFelmeddelande = "⚠️ Metoden är inte implementerad än — implementera POST /konsulter";
+        await Task.CompletedTask;
+    }
+
+    private async Task RaderaKonsult(int id)
+    {
+        // TODO: Anropa DELETE /konsulter/{id}
+        // Tips: Bara Admin har rätt att radera konsulter — API:t nekar annars
+        // Tips: Anropa HamtaKonsulter() efteråt
+
+        konsultFelmeddelande = "⚠️ Metoden är inte implementerad än — implementera DELETE /konsulter/{id}";
+        await Task.CompletedTask;
+    }
+
+    // Returnerar CSS-klassnamn baserat på statusvärde
+    private static string StatusKlass(string status) => status switch
+    {
+        "Planeras" => "status-planeras",
+        "Pågående" => "status-pagaende",
+        "Slutfört" => "status-slutfort",
+        "Avbrutet" => "status-avbrutet",
+        _          => ""
+    };
+
+    // Datamodell för uppdrag — Konsult är tilldelad operativ (tomt om ingen tilldelats ännu)
+    private record Uppdrag(int Id, string Titel, string Status, string Prioritet, string Konsult = "");
+
+    // Datamodell för konsult — nullable fält returneras bara om din roll har tillgång.
+    // The Continental lämnar inte ut mer information än vad din position kräver.
+    // Praktikant  → Telefon fylls i, Adress/Stad är null
+    // Mellanchef  → Adress/Stad fylls i, Telefon är null
+    // Konsultchef och Admin → alla fält
+    private record Konsult(int Id, string Namn, string? Telefon, string? Adress, string? Stad);
+}
+
+<style>
+    h2 { margin: 1.5rem 0 1rem; font-size: 1rem; color: #c0392b; text-transform: uppercase; letter-spacing: 2px; }
+    hr { border: none; border-top: 1px solid #2a2a2a; margin: 2rem 0; }
+
+    .status { color: #555; font-style: italic; }
+
+    .uppdragstabell { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+
+    .uppdragstabell th {
+        text-align: left;
+        padding: 0.6rem 1rem;
+        background: #1a1a1a;
+        color: #777;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 1px;
+        border-bottom: 1px solid #2a2a2a;
+    }
+
+    .uppdragstabell td { padding: 0.75rem 1rem; border-bottom: 1px solid #1a1a1a; }
+    .uppdragstabell tr:hover td { background: #141414; }
+
+    .id      { color: #555; font-size: 0.8rem; }
+    .konsult { color: #aaa; font-style: italic; font-size: 0.85rem; }
+
+    .inline-select {
+        background: #1a1a1a;
+        border: 1px solid #2a2a2a;
+        border-radius: 3px;
+        color: #e0e0e0;
+        font-family: inherit;
+        font-size: 0.8rem;
+        padding: 0.2rem 0.4rem;
+        cursor: pointer;
+    }
+
+    .inline-select:focus { outline: none; border-color: #c0392b; }
+    .inline-select.status-planeras { color: #5dade2; }
+    .inline-select.status-pagaende { color: #f39c12; }
+    .inline-select.status-slutfort { color: #27ae60; }
+    .inline-select.status-avbrutet { color: #e74c3c; }
+
+    .badge { padding: 0.2rem 0.6rem; border-radius: 3px; font-size: 0.75rem; font-weight: 600; }
+    .status-planeras { background: #1a3a5c; color: #5dade2; }
+    .status-pagaende { background: #3a2a00; color: #f39c12; }
+    .status-slutfort { background: #1a3a1a; color: #27ae60; }
+    .status-avbrutet { background: #3a1a1a; color: #e74c3c; }
+
+    .avbrytknapp {
+        background: none;
+        border: 1px solid #3a1a1a;
+        color: #c0392b;
+        padding: 0.25rem 0.6rem;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-family: inherit;
+    }
+
+    .avbrytknapp:hover { background: #1a0a0a; }
+
+    .nyttuppdrag { max-width: 450px; }
+    .falt        { margin-bottom: 1rem; }
+    .falt label  { display: block; font-size: 0.8rem; color: #777; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.4rem; }
+
+    .falt input,
+    .falt select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: #1a1a1a;
+        border: 1px solid #2a2a2a;
+        border-radius: 3px;
+        color: #e0e0e0;
+        font-family: inherit;
+        font-size: 0.95rem;
+    }
+
+    .falt input:focus,
+    .falt select:focus { outline: none; border-color: #c0392b; }
+
+    .nyttuppdrag button {
+        background: #c0392b;
+        color: white;
+        border: none;
+        padding: 0.6rem 1.5rem;
+        border-radius: 3px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.95rem;
+    }
+
+    .nyttuppdrag button:hover     { background: #a93226; }
+    .nyttuppdrag button[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+    .fel { color: #c0392b; margin-top: 0.5rem; font-size: 0.85rem; }
+</style>

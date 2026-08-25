@@ -1,0 +1,37 @@
+@* MainLayout.razor — layoutmallen som omger alla sidor
+   @Body är platshållaren där sidans eget innehåll renderas *@
+
+@inherits LayoutComponentBase
+
+<div class="layout">
+    <header>
+        <h1>☠️ Skurk AB</h1>
+        <p>Konsultförmedling &amp; Uppdragshantering — behörighet krävs</p>
+    </header>
+
+    <main>
+        @Body
+    </main>
+</div>
+
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: 'Courier New', Courier, monospace;
+        background: #0d0d0d;
+        color: #e0e0e0;
+    }
+
+    header {
+        background: #1a1a1a;
+        border-bottom: 2px solid #c0392b;
+        padding: 1.5rem 2rem;
+        text-align: center;
+    }
+
+    header h1 { font-size: 2rem; color: #c0392b; margin-bottom: 0.25rem; }
+    header p  { color: #777; font-size: 0.85rem; letter-spacing: 1px; }
+
+    main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+</style>
