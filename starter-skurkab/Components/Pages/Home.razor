@@ -210,7 +210,7 @@ else
     {
         laddar = true;
 
-        // TODO: Anropa GET /uppdrag på ditt API och fyll listan `uppdrag`
+        
         var client = HttpClientFactory.CreateClient("SkurkApi"); 
 
         var result = await client.GetFromJsonAsync<List<Uppdrag>>("/uppdrag"); 
@@ -228,13 +228,14 @@ else
 
         var client = HttpClientFactory.CreateClient("SkurkApi"); 
 
-        var responseMessage = await client.PostAsJsonAsync("/uppdrag", new {
+        var response = await client.PostAsJsonAsync("/uppdrag", new {
             Titel = titel, Prioritet = prioritet, Status = "Planeras"
             });
 
-        if (!responseMessage.IsSuccessStatusCode) {
+        
+        if ((int)response.StatusCode == StatusCodes.Status403Forbidden) {
 
-            felmeddelande = "⚠️ Fel vid skapande av uppdrag";
+            felmeddelande = "⚠️ Obehörig";
         } 
 
         await HamtaUppdrag();
@@ -249,10 +250,10 @@ else
 
         var response = await client.DeleteAsync($"/uppdrag/{id}");
 
-        if (!response.IsSuccessStatusCode) {
+        if ((int)response.StatusCode == StatusCodes.Status403Forbidden) {
 
-            felmeddelande = "⚠️ Fel vid delete";
-        }
+            felmeddelande = "⚠️ Obehörig";
+        } 
 
         await HamtaUppdrag();
 
@@ -260,13 +261,17 @@ else
 
     private async Task AndraStatus(int id, string nyStatus)
     {
-        // TODO: Anropa PUT /uppdrag/{id} med nyStatus
-        // Tips: PutAsJsonAsync($"/uppdrag/{id}", new { Status = nyStatus })
-        // Tips: Bara Mellanchef och högre har rätt att ändra status — API:t nekar annars
-        // Tips: Anropa HamtaUppdrag() efteråt
 
-        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera PUT /uppdrag/{id}";
-        await Task.CompletedTask;
+        var client = HttpClientFactory.CreateClient("SkurkApi"); 
+
+        var response = await client.PutAsJsonAsync($"/updrag/{id}",new {Status = nyStatus});
+
+        if ((int)response.StatusCode == StatusCodes.Status403Forbidden) {
+
+            felmeddelande = "⚠️ Obehörig";
+        } 
+        
+        await HamtaUppdrag();
     }
 
     private async Task AndraPrioritet(int id, string nyPrioritet)
