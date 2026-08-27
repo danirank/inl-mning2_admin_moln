@@ -278,7 +278,7 @@ else
     {
         var client = HttpClientFactory.CreateClient("SkurkApi"); 
 
-        var response = await client.PutAsJsonAsync($"/updrag/{id}",new {Prioritet = nyPrioritet});
+        var response = await client.PutAsJsonAsync($"/uppdrag/{id}",new {Prioritet = nyPrioritet});
 
         if ((int)response.StatusCode == StatusCodes.Status403Forbidden) {
 
@@ -288,53 +288,69 @@ else
         await HamtaUppdrag();
     }
 
-    private async Task TilldelaKonsult(int uppdragId, string konsultNamn)
+   private async Task TilldelaKonsult(int uppdragId, string konsultNamn)
+{
+    if (string.IsNullOrEmpty(konsultNamn)) return;
+
+    var client = HttpClientFactory.CreateClient("SkurkApi");
+
+    var response = await client.PutAsJsonAsync(
+        $"/uppdrag/{uppdragId}/konsult",
+        new { KonsultNamn = konsultNamn }
+    );
+
+    if ((int)response.StatusCode == StatusCodes.Status403Forbidden)
     {
-        if (string.IsNullOrEmpty(konsultNamn)) return;
-
-        // TODO: Anropa PUT /uppdrag/{id}/konsult med konsultNamn (eller konsult-id om API:t kräver det)
-        // Tips: Bara Konsultchef och Admin har rätt att tilldela konsulter — API:t nekar annars
-        // Tips: Anropa HamtaUppdrag() efteråt så tabellen uppdateras
-
-        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera PUT /uppdrag/{id}/konsult";
-        await Task.CompletedTask;
+        felmeddelande = "⚠️ Obehörig";
     }
 
-    private async Task HamtaKonsulter()
-    {
-        // TODO: Anropa GET /konsulter och fyll listan `konsulter`
-        // OBS: API:t returnerar bara de fält din roll har rätt att se.
-        //      Praktikant  → Telefon fylls i, Adress/Stad är null
-        //      Mellanchef  → Adress/Stad fylls i, Telefon är null
-        //      Konsultchef och Admin → alla fält
-        await Task.CompletedTask;
+    await HamtaUppdrag();
+}
 
-        // DEMO: en exempelkonsult så du ser hur listan och konsult-comboboxen i uppdragstabellen populeras.
-        // Ersätts av riktiga konsulter när du implementerar GET /konsulter ovan.
-        konsulter = [ new(1, "Ronny Rövare", "070-666666", "Mörkret 1", "Stockholm") ];
+private async Task HamtaKonsulter()
+{
+    var client = HttpClientFactory.CreateClient("SkurkApi");
+
+    var result = await client.GetFromJsonAsync<List<Konsult>>("/konsulter");
+
+    konsulter = result ?? new List<Konsult>();
+}
+
+private async Task SkapaKonsult()
+{
+    if (string.IsNullOrWhiteSpace(nyttKonsultnamn)) return;
+
+    var client = HttpClientFactory.CreateClient("SkurkApi");
+
+    var response = await client.PostAsJsonAsync(
+        "/konsulter",
+        new
+        {
+            Namn = nyttKonsultnamn
+        }
+    );
+
+    if ((int)response.StatusCode == StatusCodes.Status403Forbidden)
+    {
+        konsultFelmeddelande = "⚠️ Obehörig";
     }
 
-    private async Task SkapaKonsult()
+    await HamtaKonsulter();
+}
+
+private async Task RaderaKonsult(int id)
+{
+    var client = HttpClientFactory.CreateClient("SkurkApi");
+
+    var response = await client.DeleteAsync($"/konsulter/{id}");
+
+    if ((int)response.StatusCode == StatusCodes.Status403Forbidden)
     {
-        if (string.IsNullOrWhiteSpace(nyttKonsultnamn)) return;
-
-        // TODO: Anropa POST /konsulter med det nya konsultnamnet
-        // Tips: Bara Konsultchef och Admin har rätt att registrera konsulter — API:t nekar annars
-        // Tips: Anropa HamtaKonsulter() efteråt
-
-        konsultFelmeddelande = "⚠️ Metoden är inte implementerad än — implementera POST /konsulter";
-        await Task.CompletedTask;
+        konsultFelmeddelande = "⚠️ Obehörig";
     }
 
-    private async Task RaderaKonsult(int id)
-    {
-        // TODO: Anropa DELETE /konsulter/{id}
-        // Tips: Bara Admin har rätt att radera konsulter — API:t nekar annars
-        // Tips: Anropa HamtaKonsulter() efteråt
-
-        konsultFelmeddelande = "⚠️ Metoden är inte implementerad än — implementera DELETE /konsulter/{id}";
-        await Task.CompletedTask;
-    }
+    await HamtaKonsulter();
+}
 
     // Returnerar CSS-klassnamn baserat på statusvärde
     private static string StatusKlass(string status) => status switch
