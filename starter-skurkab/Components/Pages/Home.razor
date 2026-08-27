@@ -211,13 +211,18 @@ else
         laddar = true;
 
         // TODO: Anropa GET /uppdrag på ditt API och fyll listan `uppdrag`
+        var client = HttpClientFactory.CreateClient("SkurkApi"); 
+
+        var result = await client.GetFromJsonAsync<List<Uppdrag>>("/uppdrag"); 
+
+        uppdrag = result ?? new List<Uppdrag>();
         // Tips: HttpClientFactory.CreateClient("SkurkApi") ger dig en konfigurerad HttpClient
         // Tips: GetFromJsonAsync<List<Uppdrag>>("/uppdrag") deserialiserar JSON åt dig automatiskt
-        await Task.CompletedTask; // ta bort den här raden när du lägger in ditt API-anrop
+       // await Task.CompletedTask; // ta bort den här raden när du lägger in ditt API-anrop
 
         // DEMO: ett exempeluppdrag så du ser hur tabellen, dropdown och combobox renderas.
         // Ersätts av riktiga uppdrag när du implementerar GET /uppdrag ovan.
-        uppdrag = [ new(1, "Operation Mörkblå", "Pågående", "KRITISK", "Ronny Rövare") ];
+        //uppdrag = [ new(1, "Operation Mörkblå", "Pågående", "KRITISK", "Ronny Rövare") ];
 
         laddar = false;
     }
