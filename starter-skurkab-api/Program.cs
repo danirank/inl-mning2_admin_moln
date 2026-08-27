@@ -186,23 +186,64 @@ app.Run();
 // Lokalt (utan Easy Auth): returnerar "Admin" så Swagger fungerar utan inloggning.
 string HamtaRoll(HttpRequest request)
 {
-    var header = request.Headers["X-MS-CLIENT-PRINCIPAL"].FirstOrDefault();
-    if (string.IsNullOrEmpty(header)) return "Admin"; // lokal dev
+    var principalHeader = request.Headers["X-MS-CLIENT-PRINCIPAL"].FirstOrDefault();
 
+    if (string.IsNullOrWhiteSpace(principalHeader))
+        return "Admin"; // lokal utveckling
+
+    var epost = HamtaEasyAuthEpost(principalHeader)
+                ?? request.Headers["X-MS-CLIENT-PRINCIPAL-NAME"].FirstOrDefault();
+
+    return epost?.Trim().ToLowerInvariant() switch
+    {
+        "daniel.rank@ithogskolan.onmicrosoft.com" => "Admin",
+        "emblafelicia.johansson@ithogskolan.onmicrosoft.com" => "Mellanchef",
+        "william.nilsson@ithogskolan.onmicrosoft.com" => "Konsultchef",
+        _ => "Praktikant"
+    };
+}
+
+string? HamtaEasyAuthEpost(string principalHeader)
+{
     try
     {
-        var json = Encoding.UTF8.GetString(Convert.FromBase64String(header));
+        var json = Encoding.UTF8.GetString(
+            Convert.FromBase64String(principalHeader));
+
         using var doc = JsonDocument.Parse(json);
-        foreach (var claim in doc.RootElement.GetProperty("claims").EnumerateArray())
+
+        if (!doc.RootElement.TryGetProperty("claims", out var claims))
+            return null;
+
+        foreach (var claim in claims.EnumerateArray())
         {
-            if (claim.GetProperty("typ").GetString() == "roles")
-                return claim.GetProperty("val").GetString() ?? "Praktikant";
+            var typ = claim.GetProperty("typ").GetString();
+            var val = claim.GetProperty("val").GetString();
+
+            if (typ is null || val is null)
+                continue;
+
+            // Vanliga claim-typer där Entra kan lägga e-post/UPN
+            if (typ.Equals("preferred_username", StringComparison.OrdinalIgnoreCase) ||
+                typ.Equals("upn", StringComparison.OrdinalIgnoreCase) ||
+                typ.Equals("email", StringComparison.OrdinalIgnoreCase) ||
+                typ.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+                    StringComparison.OrdinalIgnoreCase) ||
+                typ.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return val;
+            }
         }
     }
-    catch { }
+    catch
+    {
+        return null;
+    }
 
-    return "Praktikant"; // okänd roll → minsta behörighet
+    return null;
 }
+//För lokalt testande utan Easy Auth. test rollen skickas i headern X-Test-Role. Om header saknas → Praktikant.
 
 // Kontrollerar om en roll har tillräcklig behörighet.
 // Hierarki: Praktikant < Mellanchef < Konsultchef < Admin
