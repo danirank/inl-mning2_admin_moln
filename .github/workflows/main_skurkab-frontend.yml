@@ -29,10 +29,10 @@ jobs:
           dotnet-version: '10.x'
 
       - name: Build backend
-        run: dotnet build starter-skurkab-api/SkurkAb.csproj --configuration Release
+        run: dotnet build starter-skurkab-api/SkurkAB.csproj --configuration Release
 
       - name: Publish backend
-        run: dotnet publish starter-skurkab-api/SkurkAb.csproj -c Release -o "${{env.DOTNET_ROOT}}/myapp"
+        run: dotnet publish starter-skurkab-api/SkurkAB.csproj -c Release -o "${{env.DOTNET_ROOT}}/myapp"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
