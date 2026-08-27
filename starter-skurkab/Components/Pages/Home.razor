@@ -264,7 +264,7 @@ else
 
         var client = HttpClientFactory.CreateClient("SkurkApi"); 
 
-        var response = await client.PutAsJsonAsync($"/updrag/{id}",new {Status = nyStatus});
+        var response = await client.PutAsJsonAsync($"/uppdrag/{id}",new {Status = nyStatus});
 
         if ((int)response.StatusCode == StatusCodes.Status403Forbidden) {
 
