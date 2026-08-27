@@ -276,12 +276,16 @@ else
 
     private async Task AndraPrioritet(int id, string nyPrioritet)
     {
-        // TODO: Anropa PUT /uppdrag/{id} med nyPrioritet
-        // Tips: PutAsJsonAsync($"/uppdrag/{id}", new { Prioritet = nyPrioritet })
-        // Tips: Anropa HamtaUppdrag() efteråt
+        var client = HttpClientFactory.CreateClient("SkurkApi"); 
 
-        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera PUT /uppdrag/{id}";
-        await Task.CompletedTask;
+        var response = await client.PutAsJsonAsync($"/updrag/{id}",new {Prioritet = nyPrioritet});
+
+        if ((int)response.StatusCode == StatusCodes.Status403Forbidden) {
+
+            felmeddelande = "⚠️ Obehörig";
+        } 
+        
+        await HamtaUppdrag();
     }
 
     private async Task TilldelaKonsult(int uppdragId, string konsultNamn)
