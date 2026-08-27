@@ -50,7 +50,7 @@ app.UseCors("SkurkPolicy");
 // Datan nollställs vid omstart — en riktig app använder databas
 // -------------------------------------------------------
 
-var uppdrag   = new List<Uppdrag>  { new(1, "Operation Mörkblå", "Pågående", "KRITISK", "Ronny Rövare") };
+var uppdrag   = new List<Uppdrag>  { new(1, "Operation Mörkblå", "Pågående", "KRITISK", "Ronny Rövare-api") };
 var konsulter = new List<Konsult>  { new(1, "Ronny Rövare", "070-666666", "Mörkret 1", "Stockholm") };
 var nastaUppdragId = 2;
 var nastaKonsultId = 2;
