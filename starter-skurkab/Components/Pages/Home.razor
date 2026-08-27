@@ -216,13 +216,7 @@ else
         var result = await client.GetFromJsonAsync<List<Uppdrag>>("/uppdrag"); 
 
         uppdrag = result ?? new List<Uppdrag>();
-        // Tips: HttpClientFactory.CreateClient("SkurkApi") ger dig en konfigurerad HttpClient
-        // Tips: GetFromJsonAsync<List<Uppdrag>>("/uppdrag") deserialiserar JSON åt dig automatiskt
-       // await Task.CompletedTask; // ta bort den här raden när du lägger in ditt API-anrop
-
-        // DEMO: ett exempeluppdrag så du ser hur tabellen, dropdown och combobox renderas.
-        // Ersätts av riktiga uppdrag när du implementerar GET /uppdrag ovan.
-        //uppdrag = [ new(1, "Operation Mörkblå", "Pågående", "KRITISK", "Ronny Rövare") ];
+        
 
         laddar = false;
     }
@@ -231,20 +225,37 @@ else
     {
         if (string.IsNullOrWhiteSpace(titel)) return;
 
-        // TODO: Skicka ett nytt uppdrag till POST /uppdrag på ditt API
-        // Tips: PostAsJsonAsync("/uppdrag", new { Titel = titel, Prioritet = prioritet, Status = "Planeras" })
-        // Tips: Anropa HamtaUppdrag() efteråt så uppdateras listan
 
-        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera POST /uppdrag";
+        var client = HttpClientFactory.CreateClient("SkurkApi"); 
+
+        var responseMessage = await client.PostAsJsonAsync("/uppdrag", new {
+            Titel = titel, Prioritet = prioritet, Status = "Planeras"
+            });
+
+        if (!responseMessage.IsSuccessStatusCode) {
+
+            felmeddelande = "⚠️ Fel vid skapande av uppdrag";
+        } 
+
+        await HamtaUppdrag();
+
     }
 
     private async Task AvbrytUppdrag(int id)
     {
-        // TODO: Anropa DELETE /uppdrag/{id} på ditt API
-        // Tips: Anropa HamtaUppdrag() efteråt så försvinner uppdraget från tabellen
+        
 
-        felmeddelande = "⚠️ Metoden är inte implementerad än — implementera DELETE /uppdrag/{id}";
-        await Task.CompletedTask;
+        var client = HttpClientFactory.CreateClient("SkurkApi"); 
+
+        var response = await client.DeleteAsync($"/uppdrag/{id}");
+
+        if (!response.IsSuccessStatusCode) {
+
+            felmeddelande = "⚠️ Fel vid delete";
+        }
+
+        await HamtaUppdrag();
+
     }
 
     private async Task AndraStatus(int id, string nyStatus)

@@ -1,5 +1,11 @@
 # Rapport uppgift 2 
 
+## Kod  
+
+Lagt till get metod i frontend - Daniel
+Lagt till 
+
+
 ## Deployment 
 
 
