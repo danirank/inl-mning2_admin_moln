@@ -1,13 +1,19 @@
 # Rapport uppgift 2 
 
-## Kod  
+## Kod
 
-- Metoder i Blazor projekt. --> CRUD för Uppdrag & Konsulter 
+- Blazor-projektet innehåller metoder för **CRUD-operationer** för uppdrag och konsulter.
+- Frontend kommunicerar med backend-API:t via `HttpClient`.
+- API:t använder en **InMemory-databas**, vilket räcker för projektets syfte utan en separat databasresurs.
+- Roller och behörigheter används för att styra vilka användare som får utföra olika operationer.
 
-## Deployment 
+## Deployment
 
-- CI/CD med github actions
-- 
+- Frontend och API är deployade som **Azure App Services**.
+- Deployment sker automatiskt med **CI/CD via GitHub Actions**.
+- Vid push till `main` byggs och publiceras projekten till Azure.
+- GitHub Actions gör deploymenten repeterbar och minskar behovet av manuella publiceringar.
+- Azure-resurserna är kopplade till projektets nätverks- och säkerhetslösning med VNet, subnets, NSG och Entra ID.
 
 
 ## Nätverkssäkerhet i Azure
@@ -52,13 +58,15 @@ Lösningen följer principen deny by default: endast nödvändig trafik tillåts
 ## Entra  
 
 
-Varför Microsoft Entra och Easy auth?
-Genom Entra Id och Easy Auth säkerställer vi att all som kommer in får vara där och alla som är där kan bara göra saker som vi tillåter dom att göra. Väldigt skyddart och säkert 
+# Varför Microsoft Entra och Easy auth?
 
+Genom Entra Id och Easy Auth säkerställer vi att all som kommer in får vara där och alla som är där kan bara göra saker som vi tillåter dom att göra. Väldigt skyddart och säkert
 
-Skapa de fyra Entra Id användare
-För att skapa upp användarna går vi in i terminalen och 
-”
+## Skapa de fyra Entra Id användare
+
+För att skapa upp användarna går vi in i terminalen och
+
+```powershell
 az ad user create `
   --display-name "Praktikant" `
   --user-principal-name "praktikant@IThogskolan.onmicrosoft.com" `
@@ -78,31 +86,39 @@ az ad user create `
   --display-name "Admin" `
   --user-principal-name "admin@IThogskolan.onmicrosoft.com" `
   --password "Hitta-På-Ett-temporärt-Lösenord"
-"
+```
 
-RBAC
-När alla användare är skapade behöver vi ge dom RBAC så att dom får tillgång till vår app. Vi ger dom rollen ”Reader” för att dom inte ska kunna ändra/skapa/ta bort något, bara läsa. 
+# RBAC
+
+När alla användare är skapade behöver vi ge dom RBAC så att dom får tillgång till vår app. Vi ger dom rollen ”Reader” för att dom inte ska kunna ändra/skapa/ta bort något, bara läsa.
+
 Först hämtar vi vårat subscribtion id för att sätta rätt scope sen.
-”
+
+```powershell
 az group show `
   --name resource-group-here `
   --query id `
   -o tsv
-”
-Sedan hämtar du och ger varje användares id 
-”
+```
+
+Sedan hämtar du och ger varje användares id
+
+```powershell
 az ad user show `
   --id "praktikant@IThogskolan.onmicrosoft.com" `
   --query id `
   -o tsv
-”
+```
+
 Och ger dom ”Reader” rollen en i taget
-”
+
+```powershell
 az role assignment create `
   --assignee "a1b2c3d4-...." `
   --role "Reader" `
   --scope "/subscriptions/xxxx-xxxx/resourceGroups/MyResourceGroup"
-”
+```
+
 
 App registrering & app roller
 Nu skapar vi en application som representerar vårt api och sedan skapar upp roller specefika för applicationen. Den här delen är faktiskt enklare att göra i portalen istället för terminalen.
@@ -125,3 +141,17 @@ I vårt projekt så har vi somsagt data-subnet, den finns och kan ta emot intern
 Ett andra lager rör hemligheter. Med en InMemory databas finns inga lösenord eller anslutnings string att skydda, men i det scenariot ovan, om det nu vore en riktig miljö med en riktig databas, så hade databasens anslutnings string annars troligen legat i klartext i App Service konfiguration. Men genom att aktivera Managed Identity på API:ts App Service och ge den en begränsad roll (text Key Vault Secret User) på en Key Vault, så hade appen kunnat hämta hemligheten utan att den någonsin lagras i kod eller konfigurationen.
 
 Utöver det så saknas det i dagsläget även en brandvägg på applikationsnivå (text Web Application Firewall via Application Gateway) som filtrerar skadliga requests innan de når App Service, samt central loggning och avvikelserdetektering (Azure Monitor / Microsoft Defender för Cloud) som hade kunnat fånga in onormala anropsmönster, något som NSG och RBAC i sig inte larmar om. RBAC rollerna som vi satte upp är dessutom statiska. I en riktig organisation hade de behövt granskas löpande i takt med att personer byter roller eller slutar, så att de inte blir för generösa över tid.
+
+
+
+### Praktikant får 403 vid delete 
+![Alt-text](/rapport/praktikant_403.png)
+
+
+
+### Praktikant kan inte se adress
+![Alt-text](/rapport/praktikant_adress.png)
+
+
+### Mellanchef kan inte se telefon
+![Alt-text](/rapport/mellanchef.png)
