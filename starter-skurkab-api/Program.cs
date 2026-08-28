@@ -196,11 +196,13 @@ string HamtaRoll(HttpRequest request)
 
     return epost?.Trim().ToLowerInvariant() switch
     {
-        "daniel.rank@ithogskolan.onmicrosoft.com" => "Admin",
+        "daniel.rank@ithogskolan.onmicrosoft.com" => "Praktikant",
         "emblafelicia.johansson@ithogskolan.onmicrosoft.com" => "Mellanchef",
         "william.nilsson@ithogskolan.onmicrosoft.com" => "Konsultchef",
         _ => "Praktikant"
     };
+
+
 }
 
 string? HamtaEasyAuthEpost(string principalHeader)
